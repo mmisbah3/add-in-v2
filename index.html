@@ -4,8 +4,9 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Excel Translator 2016 Fix</title>
+  <title>Excel Translator 2016 Multi-Cell</title>
   
+  <!-- Office JS -->
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   
   <style>
@@ -23,12 +24,13 @@
     .status-info { background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
     .status-success { background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
     .status-error { background-color: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .status-warning { background-color: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
   </style>
 </head>
 <body>
 
   <div class="title">🌐 Excel Translator</div>
-  <div class="subtitle">Khusus Excel 2016 Desktop (JSONP Engine)</div>
+  <div class="subtitle">Menerjemahkan Sel/Range Terpilih</div>
 
   <label for="sourceLang">Bahasa Asal (Sebelum)</label>
   <select id="sourceLang">
@@ -38,6 +40,10 @@
     <option value="ja">Japanese (Jepang)</option>
     <option value="zh">Chinese (Mandarin)</option>
     <option value="ko">Korean (Korea)</option>
+    <option value="es">Spanish (Spanyol)</option>
+    <option value="fr">French (Prancis)</option>
+    <option value="de">German (Jerman)</option>
+    <option value="ar">Arabic (Arab)</option>
   </select>
 
   <label for="targetLang">Bahasa Tujuan (Sesudah)</label>
@@ -47,6 +53,10 @@
     <option value="ja">Japanese (Jepang)</option>
     <option value="zh">Chinese (Mandarin)</option>
     <option value="ko">Korean (Korea)</option>
+    <option value="es">Spanish (Spanyol)</option>
+    <option value="fr">French (Prancis)</option>
+    <option value="de">German (Jerman)</option>
+    <option value="ar">Arabic (Arab)</option>
   </select>
 
   <label>Posisi Hasil Terjemahan</label>
@@ -63,7 +73,7 @@
   <script>
     Office.onReady(function (info) {
       if (info.host === Office.HostType.Excel) {
-        showStatus("Add-in siap.", "info");
+        showStatus("Add-in siap digunakan.", "info");
       }
     });
 
@@ -79,8 +89,8 @@
       }
 
       btn.disabled = true;
-      btn.innerText = "Proses Menerjemahkan...";
-      showStatus("Membaca sel Excel...", "info");
+      btn.innerText = "Memproses Terjemahan...";
+      showStatus("Membaca sel terpilih...", "info");
 
       Excel.run(function (context) {
         var range = context.workbook.getSelectedRange();
@@ -88,68 +98,104 @@
 
         return context.sync().then(function () {
           var values = range.values;
-          var translatedValues = [];
+          var rowCount = values.length;
+          var colCount = values[0].length;
+          var totalCells = rowCount * colCount;
 
-          for (var i = 0; i < values.length; i++) {
-            translatedValues.push(new Array(values[i].length));
+          var translatedMatrix = [];
+          var pendingCount = 0;
+          var hasText = false;
+
+          // Inisialisasi matriks hasil
+          for (var r = 0; r < rowCount; r++) {
+            var rowArray = [];
+            for (var c = 0; c < colCount; c++) {
+              rowArray.push("");
+            }
+            translatedMatrix.push(rowArray);
           }
 
-          function translateCell(r, c) {
-            if (r >= values.length) {
-              // Semua sel selesai diterjemahkan
-              var targetRange;
-              if (position === "replace") targetRange = range;
-              else if (position === "right") targetRange = range.getOffsetRange(0, range.columnCount);
-              else if (position === "below") targetRange = range.getOffsetRange(range.rowCount, 0);
-
-              targetRange.values = translatedValues;
-              return context.sync().then(function () {
-                showStatus("Selesai menerjemahkan!", "success");
-                btn.disabled = false;
-                btn.innerText = "Terjemahkan Sel Terpilih";
-              });
-            }
-
-            var nextR = (c + 1 >= values[r].length) ? r + 1 : r;
-            var nextC = (c + 1 >= values[r].length) ? 0 : c + 1;
-            var val = values[r][c] ? values[r][c].toString() : "";
-
-            if (val.replace(/^\s+|\s+$/g, '') === "") {
-              translatedValues[r][c] = "";
-              translateCell(nextR, nextC);
-            } else {
-              showStatus("Proses baris " + (r + 1) + " kolom " + (c + 1) + "...", "info");
-              jsonpTranslate(val, srcLang, tgtLang, function (resText) {
-                translatedValues[r][c] = resText;
-                translateCell(nextR, nextC);
-              });
+          // Hitung sel yang berisi teks
+          for (var r = 0; r < rowCount; r++) {
+            for (var c = 0; c < colCount; c++) {
+              var str = values[r][c] ? values[r][c].toString().replace(/^\s+|\s+$/g, '') : "";
+              if (str !== "") {
+                hasText = true;
+                pendingCount++;
+              }
             }
           }
 
-          translateCell(0, 0);
+          if (!hasText) {
+            showStatus("Tidak ada teks pada sel yang Anda pilih!", "warning");
+            btn.disabled = false;
+            btn.innerText = "Terjemahkan Sel Terpilih";
+            return;
+          }
+
+          showStatus("Menerjemahkan " + pendingCount + " sel...", "info");
+
+          // Eksekusi terjemahan paralel per sel
+          for (var r = 0; r < rowCount; r++) {
+            for (var c = 0; c < colCount; c++) {
+              var text = values[r][c] ? values[r][c].toString().replace(/^\s+|\s+$/g, '') : "";
+              if (text !== "") {
+                (function(row, col, txt) {
+                  jsonpTranslate(txt, srcLang, tgtLang, function(res) {
+                    translatedMatrix[row][col] = res;
+                    pendingCount--;
+
+                    if (pendingCount <= 0) {
+                      // Semua sel selesai diproses, tulis hasil ke Excel
+                      var targetRange;
+                      if (position === "replace") targetRange = range;
+                      else if (position === "right") targetRange = range.getOffsetRange(0, colCount);
+                      else if (position === "below") targetRange = range.getOffsetRange(rowCount, 0);
+
+                      targetRange.values = translatedMatrix;
+                      context.sync().then(function() {
+                        showStatus("Selesai menerjemahkan " + totalCells + " sel!", "success");
+                        btn.disabled = false;
+                        btn.innerText = "Terjemahkan Sel Terpilih";
+                      }).catch(function(err) {
+                        showStatus("Gagal menulis ke sel: " + (err.message || err), "error");
+                        btn.disabled = false;
+                        btn.innerText = "Terjemahkan Sel Terpilih";
+                      });
+                    }
+                  });
+                })(r, c, text);
+              }
+            }
+          }
         });
-      }).catch(function (err) {
-        showStatus("Gagal membaca sel: " + err.message, "error");
+      }).catch(function (error) {
+        showStatus("Gagal membaca sel: " + (error.message || error), "error");
         btn.disabled = false;
         btn.innerText = "Terjemahkan Sel Terpilih";
       });
     }
 
-    // Penerjemah berbasis Script Injection (Tembus Keamanan IE11)
+    // Engine JSONP untuk IE11 / Excel 2016
     function jsonpTranslate(text, from, to, callback) {
       var src = (from === "auto") ? "" : from;
       var pair = (src || "autodetect") + "|" + to;
-      var cbName = "cb_" + Math.round(Math.random() * 1000000);
+      var cbName = "cb_" + Math.floor(Math.random() * 10000000);
+
+      var isResponded = false;
 
       window[cbName] = function (data) {
+        if (isResponded) return;
+        isResponded = true;
+
         delete window[cbName];
         var script = document.getElementById(cbName);
-        if (script) script.parentNode.removeChild(script);
+        if (script && script.parentNode) script.parentNode.removeChild(script);
 
         if (data && data.responseData && data.responseData.translatedText) {
           callback(data.responseData.translatedText);
         } else {
-          callback("[Gagal Menerjemahkan]");
+          callback("[Gagal]");
         }
       };
 
@@ -157,20 +203,19 @@
       var scriptElem = document.createElement("script");
       scriptElem.id = cbName;
       scriptElem.src = url;
-      scriptElem.onerror = function () {
-        delete window[cbName];
-        callback("[Gagal Koneksi API]");
-      };
+
+      // Handling timeout jika koneksi internet lambat
+      setTimeout(function() {
+        if (!isResponded) {
+          isResponded = true;
+          delete window[cbName];
+          if (scriptElem && scriptElem.parentNode) scriptElem.parentNode.removeChild(scriptElem);
+          callback("[Timeout]");
+        }
+      }, 8000);
 
       document.body.appendChild(scriptElem);
     }
 
     function showStatus(msg, type) {
-      var el = document.getElementById("status");
-      el.style.display = "block";
-      el.className = "status status-" + type;
-      el.innerText = msg;
-    }
-  </script>
-</body>
-</html>
+      var el = document.getElementById("status
