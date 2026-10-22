@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>Excel Translator 2016</title>
+  <title>Excel Translator 2016 Fix</title>
   
   <!-- Office JS -->
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
@@ -13,7 +13,7 @@
     .title { font-size: 14px; font-weight: bold; color: #047857; margin-bottom: 2px; }
     .desc { color: #6b7280; margin-bottom: 10px; font-size: 10px; }
     label { font-weight: bold; display: block; margin-top: 8px; margin-bottom: 2px; color: #374151; }
-    select, input[type="text"] { width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; box-sizing: border-box; }
+    select { width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; box-sizing: border-box; }
     .box { background: #fff; padding: 6px; border: 1px solid #ccc; border-radius: 3px; margin-top: 4px; }
     .radio-item { display: block; margin-bottom: 4px; cursor: pointer; }
     .btn { width: 100%; background: #059669; color: #fff; padding: 8px; border: none; border-radius: 3px; font-weight: bold; margin-top: 10px; cursor: pointer; }
@@ -27,7 +27,7 @@
 <body>
 
   <div class="title">🌐 Excel Translator</div>
-  <div class="desc">Excel 2016 Compatible</div>
+  <div class="desc">Excel 2016 Stable Direct Engine</div>
 
   <label>Bahasa Asal</label>
   <select id="srcLang">
@@ -89,107 +89,108 @@
           var vals = range.values;
           var rCount = vals.length;
           var cCount = vals[0].length;
-          var total = rCount * cCount;
-          var translated = [];
-          var pending = 0;
+          var totalCells = rCount * cCount;
 
+          var translated = [];
           for (var r = 0; r < rCount; r++) {
             var row = [];
             for (var c = 0; c < cCount; c++) row.push("");
             translated.push(row);
           }
 
+          var cellList = [];
           for (var r = 0; r < rCount; r++) {
             for (var c = 0; c < cCount; c++) {
               var txt = vals[r][c] ? String(vals[r][c]).replace(/^\s+|\s+$/g, '') : "";
-              if (txt !== "") pending++;
+              if (txt !== "") {
+                cellList.push({ r: r, c: c, text: txt });
+              }
             }
           }
 
-          if (pending === 0) {
-            showStatus("Pilih sel yang berisi teks!", "error");
+          if (cellList.length === 0) {
+            showStatus("Pilih sel yang berisi teks!", "status-error");
             btn.disabled = false;
             btn.innerHTML = "Terjemahkan Sel Terpilih";
             return;
           }
 
-          showStatus("Menerjemahkan " + pending + " sel...", "info");
+          showStatus("Menerjemahkan " + cellList.length + " sel...", "info");
 
-          for (var r = 0; r < rCount; r++) {
-            for (var c = 0; c < cCount; c++) {
-              var text = vals[r][c] ? String(vals[r][c]).replace(/^\s+|\s+$/g, '') : "";
-              if (text !== "") {
-                (function (row, col, str) {
-                  googleTranslate(str, src, tgt, function (res) {
-                    translated[row][col] = res;
-                    pending--;
+          // Proses sel satu per satu secara sinkronus agar IE11 tidak terkunci
+          var index = 0;
 
-                    if (pending <= 0) {
-                      var targetRange;
-                      if (pos === "replace") targetRange = range;
-                      else if (pos === "right") targetRange = range.getOffsetRange(0, cCount);
-                      else if (pos === "below") targetRange = range.getOffsetRange(rCount, 0);
+          function processNext() {
+            if (index >= cellList.length) {
+              // Selesai menerjemahkan seluruh sel
+              var targetRange;
+              if (pos === "replace") targetRange = range;
+              else if (pos === "right") targetRange = range.getOffsetRange(0, cCount);
+              else if (pos === "below") targetRange = range.getOffsetRange(rCount, 0);
 
-                      targetRange.values = translated;
-                      ctx.sync().then(function () {
-                        showStatus("Selesai menerjemahkan " + total + " sel!", "success");
-                        btn.disabled = false;
-                        btn.innerHTML = "Terjemahkan Sel Terpilih";
-                      });
-                    }
-                  });
-                })(r, c, text);
-              }
+              targetRange.values = translated;
+              return ctx.sync().then(function () {
+                showStatus("Selesai menerjemahkan " + cellList.length + " sel!", "success");
+                btn.disabled = false;
+                btn.innerHTML = "Terjemahkan Sel Terpilih";
+              }).catch(function (err) {
+                showStatus("Gagal menulis ke Excel: " + err.message, "error");
+                btn.disabled = false;
+                btn.innerHTML = "Terjemahkan Sel Terpilih";
+              });
             }
+
+            var item = cellList[index];
+            showStatus("Menerjemahkan (" + (index + 1) + "/" + cellList.length + ")...", "info");
+
+            directTranslate(item.text, src, tgt, function (resultText) {
+              translated[item.r][item.c] = resultText;
+              index++;
+              processNext();
+            });
           }
+
+          processNext();
         });
       }).catch(function (err) {
-        showStatus("Gagal: " + err.message, "error");
+        showStatus("Gagal membaca sel: " + err.message, "error");
         btn.disabled = false;
         btn.innerHTML = "Terjemahkan Sel Terpilih";
       });
     }
 
-    // Engine Google Translate GTX (JSONP)
-    function googleTranslate(text, sl, tl, cb) {
-      var cbName = "cb_" + Math.floor(Math.random() * 1000000);
-      var done = false;
+    // Direct XHR Translator (Mendukung IE11)
+    function directTranslate(text, sl, tl, callback) {
+      var src = (sl === "auto") ? "auto" : sl;
+      var url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" + src + "&tl=" + tl + "&dt=t&q=" + encodeURIComponent(text);
 
-      window[cbName] = function (data) {
-        if (done) return;
-        done = true;
-        clean();
-        if (data && data[0]) {
-          var out = "";
-          for (var i = 0; i < data[0].length; i++) {
-            if (data[0][i][0]) out += data[0][i][0];
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", url, true);
+      
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4) {
+          if (xhr.status === 200) {
+            try {
+              var data = JSON.parse(xhr.responseText);
+              if (data && data[0]) {
+                var out = "";
+                for (var i = 0; i < data[0].length; i++) {
+                  if (data[0][i][0]) out += data[0][i][0];
+                }
+                callback(out);
+                return;
+              }
+            } catch (e) {}
           }
-          cb(out);
-        } else {
-          cb("[Gagal]");
+          callback("[Gagal Server]");
         }
       };
 
-      function clean() {
-        delete window[cbName];
-        var s = document.getElementById(cbName);
-        if (s && s.parentNode) s.parentNode.removeChild(s);
-      }
+      xhr.onerror = function () {
+        callback("[Gagal Koneksi]");
+      };
 
-      var url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" + sl + "&tl=" + tl + "&dt=t&q=" + encodeURIComponent(text) + "&callback=" + cbName;
-      var script = document.createElement("script");
-      script.id = cbName;
-      script.src = url;
-
-      setTimeout(function () {
-        if (!done) {
-          done = true;
-          clean();
-          cb("[Timeout]");
-        }
-      }, 6000);
-
-      document.body.appendChild(script);
+      xhr.send();
     }
 
     function showStatus(msg, type) {
