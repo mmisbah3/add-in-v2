@@ -2,22 +2,33 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Excel Translator</title>
+  <title>Excel Translator 2016</title>
+  
+  <!-- Polyfill untuk kompatibilitas IE11 / Excel 2016 Engine -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-polyfill/7.12.1/polyfill.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fetch/3.6.2/fetch.min.js"></script>
+  
   <!-- Office JS -->
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  
+  <style>
+    body { user-select: none; }
+  </style>
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans p-4 min-h-screen flex flex-col justify-between">
 
   <div class="space-y-4">
     <!-- Header -->
     <div class="border-b pb-2">
-      <h1 class="text-lg font-bold text-emerald-700 flex items-center gap-2">
+      <h1 class="text-base font-bold text-emerald-700 flex items-center gap-2">
         🌐 Excel Translator
       </h1>
-      <p class="text-xs text-gray-500">Terjemahkan teks sel langsung di lembar kerja Excel.</p>
+      <p class="text-xs text-gray-500">Penerjemah sel otomatis (Kompatibel Excel 2016+)</p>
     </div>
 
     <!-- Pilihan Bahasa -->
@@ -57,7 +68,7 @@
     <!-- Pilihan Lokasi Hasil -->
     <div class="space-y-1">
       <label class="block text-xs font-semibold text-gray-600 mb-1">Posisi Hasil Terjemahan</label>
-      <div class="space-y-1 bg-white p-2 border rounded">
+      <div class="space-y-1.5 bg-white p-2.5 border rounded">
         <label class="flex items-center text-xs gap-2 cursor-pointer">
           <input type="radio" name="position" value="right" checked class="text-emerald-600 focus:ring-emerald-500">
           <span>Di Samping (Kolom Sebelah)</span>
@@ -74,8 +85,8 @@
     </div>
 
     <!-- Tombol Eksekusi -->
-    <button id="btnTranslate" onclick="handleTranslate()" class="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold py-2 px-4 rounded text-xs transition duration-150 shadow flex justify-center items-center gap-2">
-      <span>Terjemahkan Sel Terpilih</span>
+    <button id="btnTranslate" onclick="handleTranslate()" class="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold py-2.5 px-4 rounded text-xs transition duration-150 shadow flex justify-center items-center gap-2">
+      <span id="btnText">Terjemahkan Sel Terpilih</span>
     </button>
 
     <!-- Status Output -->
@@ -83,143 +94,133 @@
   </div>
 
   <div class="text-[10px] text-gray-400 text-center mt-4">
-    Excel Web Translator Add-in v1.1
+    Excel Desktop & Web Add-in v2.0
   </div>
 
   <script>
-    Office.onReady((info) => {
+    // Inisialisasi Office JS
+    Office.onReady(function (info) {
       if (info.host === Office.HostType.Excel) {
         showStatus("Add-in siap digunakan.", "info");
       }
     });
 
-    // Fungsi Utama Terjemahkan
-    async function handleTranslate() {
-      const btn = document.getElementById("btnTranslate");
-      const srcLang = document.getElementById("sourceLang").value;
-      const tgtLang = document.getElementById("targetLang").value;
-      const position = document.querySelector('input[name="position"]:checked').value;
+    // Fungsi Utama Eksekusi Terjemahan
+    function handleTranslate() {
+      var btn = document.getElementById("btnTranslate");
+      var btnText = document.getElementById("btnText");
+      var srcLang = document.getElementById("sourceLang").value;
+      var tgtLang = document.getElementById("targetLang").value;
+      var radios = document.getElementsByName("position");
+      var position = "right";
+
+      for (var i = 0; i < radios.length; i++) {
+        if (radios[i].checked) {
+          position = radios[i].value;
+          break;
+        }
+      }
 
       btn.disabled = true;
-      btn.innerText = "Menerjemahkan...";
+      btnText.innerText = "Menerjemahkan...";
       showStatus("Membaca sel yang dipilih...", "info");
 
-      try {
-        await Excel.run(async (context) => {
-          const range = context.workbook.getSelectedRange();
-          range.load(["values", "address", "rowCount", "columnCount"]);
-          await context.sync();
+      Excel.run(function (context) {
+        var range = context.workbook.getSelectedRange();
+        range.load(["values", "rowCount", "columnCount"]);
 
-          const values = range.values;
-          let hasContent = false;
+        return context.sync().then(function () {
+          var values = range.values;
+          var promises = [];
+          var hasText = false;
 
-          // Evaluasi apakah ada teks
-          for (let r = 0; r < values.length; r++) {
-            for (let c = 0; c < values[r].length; c++) {
-              if (values[r][c] && values[r][c].toString().trim() !== "") {
-                hasContent = true;
-                break;
+          for (var r = 0; r < values.length; r++) {
+            var rowPromises = [];
+            for (var c = 0; c < values[r].length; c++) {
+              var text = values[r][c] ? values[r][c].toString() : "";
+              if (text.trim() !== "") {
+                hasText = true;
+                rowPromises.push(translateText(text, srcLang, tgtLang));
+              } else {
+                rowPromises.push(Promise.resolve(""));
               }
             }
+            promises.push(Promise.all(rowPromises));
           }
 
-          if (!hasContent) {
+          if (!hasText) {
             showStatus("Pilih sel yang berisi teks terlebih dahulu!", "warning");
+            btn.disabled = false;
+            btnText.innerText = "Terjemahkan Sel Terpilih";
             return;
           }
 
-          // Proses penerjemahan per sel
-          const translatedValues = [];
-          for (let r = 0; r < values.length; r++) {
-            const rowArr = [];
-            for (let c = 0; c < values[r].length; c++) {
-              const text = values[r][c] ? values[r][c].toString() : "";
-              if (text.trim() === "") {
-                rowArr.push("");
-              } else {
-                const translated = await translateText(text, srcLang, tgtLang);
-                rowArr.push(translated);
-              }
+          showStatus("Proses menerjemahkan teks...", "info");
+
+          return Promise.all(promises).then(function (translatedValues) {
+            var targetRange;
+
+            if (position === "replace") {
+              targetRange = range;
+            } else if (position === "right") {
+              targetRange = range.getOffsetRange(0, range.columnCount);
+            } else if (position === "below") {
+              targetRange = range.getOffsetRange(range.rowCount, 0);
             }
-            translatedValues.push(rowArr);
-          }
 
-          // Menentukan Target Range penulisan
-          let targetRange;
-          if (position === "replace") {
-            targetRange = range;
-          } else if (position === "right") {
-            targetRange = range.getOffsetRange(0, range.columnCount);
-          } else if (position === "below") {
-            targetRange = range.getOffsetRange(range.rowCount, 0);
-          }
-
-          targetRange.values = translatedValues;
-          await context.sync();
-
-          showStatus("Berhasil menerjemahkan " + (values.length * values[0].length) + " sel!", "success");
+            targetRange.values = translatedValues;
+            return context.sync().then(function () {
+              showStatus("Berhasil menerjemahkan sel!", "success");
+            });
+          });
         });
-      } catch (error) {
+      }).catch(function (error) {
         console.error(error);
         showStatus("Gagal: " + (error.message || "Terjadi kesalahan pada Excel API."), "error");
-      } finally {
+      }).then(function () {
         btn.disabled = false;
-        btn.innerText = "Terjemahkan Sel Terpilih";
-      }
+        btnText.innerText = "Terjemahkan Sel Terpilih";
+      });
     }
 
-    // Fungsi Penerjemah Multi-API (Fallback System)
-    async function translateText(text, from, to) {
-      const src = from === "auto" ? "" : from;
+    // Engine Penerjemah dengan Backup API (Fallback)
+    function translateText(text, from, to) {
+      var src = from === "auto" ? "" : from;
+      var langPair = (src || "autodetect") + "|" + to;
 
-      // Primary API: MyMemory API
-      try {
-        const langPair = (src || "autodetect") + "|" + to;
-        const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`);
-        if (res.ok) {
-          const json = await res.json();
+      // API Utama: MyMemory
+      var url1 = "https://api.mymemory.translated.net/get?q=" + encodeURIComponent(text) + "&langpair=" + encodeURIComponent(langPair);
+
+      return fetch(url1)
+        .then(function (res) { return res.json(); })
+        .then(function (json) {
           if (json.responseData && json.responseData.translatedText) {
             return json.responseData.translatedText;
           }
-        }
-      } catch (e) {
-        console.warn("MyMemory API failed, trying secondary...", e);
-      }
+          throw new Error("API 1 Fail");
+        })
+        .catch(function () {
+          // API Cadangan: Google Translate GTX Endpoint
+          var sl = src || "auto";
+          var url2 = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" + sl + "&tl=" + to + "&dt=t&q=" + encodeURIComponent(text);
 
-      // Secondary API: Google Translate Free Endpoint
-      try {
-        const sl = src || "auto";
-        const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${to}&dt=t&q=${encodeURIComponent(text)}`);
-        if (res.ok) {
-          const json = await res.json();
-          if (json && json[0]) {
-            return json[0].map(item => item[0]).join("");
-          }
-        }
-      } catch (e) {
-        console.warn("Google API failed, trying tertiary...", e);
-      }
-
-      return "[Gagal Menerjemahkan]";
+          return fetch(url2)
+            .then(function (res) { return res.json(); })
+            .then(function (json) {
+              if (json && json[0]) {
+                var result = "";
+                for (var i = 0; i < json[0].length; i++) {
+                  if (json[0][i][0]) result += json[0][i][0];
+                }
+                return result;
+              }
+              return "[Gagal]";
+            })
+            .catch(function () {
+              return "[Gagal Menerjemahkan]";
+            });
+        });
     }
 
-    // Helper Tampilan Status
-    function showStatus(msg, type) {
-      const el = document.getElementById("status");
-      el.classList.remove("hidden", "bg-blue-50", "text-blue-700", "border-blue-200", "bg-red-50", "text-red-700", "border-red-200", "bg-amber-50", "text-amber-700", "border-amber-200", "bg-emerald-50", "text-emerald-700", "border-emerald-200");
-      
-      if (type === "error") {
-        el.classList.add("bg-red-50", "text-red-700", "border-red-200");
-      } else if (type === "warning") {
-        el.classList.add("bg-amber-50", "text-amber-700", "border-amber-200");
-      } else if (type === "success") {
-        el.classList.add("bg-emerald-50", "text-emerald-700", "border-emerald-200");
-      } else {
-        el.classList.add("bg-blue-50", "text-blue-700", "border-blue-200");
-      }
-      
-      el.innerText = msg;
-    }
-  </script>
-</body>
-</html>
+    // Helper Tampilan Status Box
+    function showStatus(
