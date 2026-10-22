@@ -1,166 +1,140 @@
 <!DOCTYPE html>
-<html lang="id">
+<html>
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Excel Translator 2016 Multi-Cell</title>
+  <title>Excel Translator 2016</title>
   
   <!-- Office JS -->
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   
   <style>
-    body { font-family: Segoe UI, Tahoma, sans-serif; padding: 12px; background-color: #f9fafb; color: #333; margin: 0; }
-    .title { font-size: 15px; font-weight: bold; color: #047857; margin-bottom: 4px; }
-    .subtitle { font-size: 11px; color: #6b7280; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
-    label { font-size: 11px; font-weight: bold; color: #374151; display: block; margin-bottom: 3px; }
-    select { width: 100%; padding: 5px; font-size: 11px; border: 1px solid #d1d5db; border-radius: 4px; margin-bottom: 10px; }
-    .radio-group { background: #fff; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; margin-bottom: 12px; }
-    .radio-item { font-size: 11px; display: block; margin-bottom: 4px; cursor: pointer; }
-    .radio-item input { margin-right: 5px; }
-    .btn { width: 100%; background-color: #059669; color: white; padding: 8px; font-weight: bold; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; }
-    .btn:disabled { background-color: #9ca3af; cursor: not-allowed; }
-    .status { font-size: 11px; padding: 8px; border-radius: 4px; margin-top: 10px; display: none; word-wrap: break-word; }
-    .status-info { background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
-    .status-success { background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
-    .status-error { background-color: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-    .status-warning { background-color: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+    body { font-family: Segoe UI, Tahoma, sans-serif; padding: 10px; background: #f9fafb; font-size: 11px; color: #333; margin: 0; }
+    .title { font-size: 14px; font-weight: bold; color: #047857; margin-bottom: 2px; }
+    .desc { color: #6b7280; margin-bottom: 10px; font-size: 10px; }
+    label { font-weight: bold; display: block; margin-top: 8px; margin-bottom: 2px; color: #374151; }
+    select, input[type="text"] { width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 3px; box-sizing: border-box; }
+    .box { background: #fff; padding: 6px; border: 1px solid #ccc; border-radius: 3px; margin-top: 4px; }
+    .radio-item { display: block; margin-bottom: 4px; cursor: pointer; }
+    .btn { width: 100%; background: #059669; color: #fff; padding: 8px; border: none; border-radius: 3px; font-weight: bold; margin-top: 10px; cursor: pointer; }
+    .btn:disabled { background: #9ca3af; }
+    .status { margin-top: 8px; padding: 6px; border-radius: 3px; display: none; word-wrap: break-word; font-size: 10px; }
+    .status-info { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .status-success { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+    .status-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
   </style>
 </head>
 <body>
 
   <div class="title">🌐 Excel Translator</div>
-  <div class="subtitle">Menerjemahkan Sel/Range Terpilih</div>
+  <div class="desc">Excel 2016 Compatible</div>
 
-  <label for="sourceLang">Bahasa Asal (Sebelum)</label>
-  <select id="sourceLang">
-    <option value="auto" selected>Auto Detect (Otomatis)</option>
-    <option value="en">English (Inggris)</option>
-    <option value="id">Indonesian (Indonesia)</option>
-    <option value="ja">Japanese (Jepang)</option>
-    <option value="zh">Chinese (Mandarin)</option>
-    <option value="ko">Korean (Korea)</option>
-    <option value="es">Spanish (Spanyol)</option>
-    <option value="fr">French (Prancis)</option>
-    <option value="de">German (Jerman)</option>
-    <option value="ar">Arabic (Arab)</option>
+  <label>Bahasa Asal</label>
+  <select id="srcLang">
+    <option value="auto">Auto Detect</option>
+    <option value="en">English</option>
+    <option value="id">Indonesian</option>
+    <option value="ja">Japanese</option>
+    <option value="zh-CN">Chinese</option>
+    <option value="ko">Korean</option>
   </select>
 
-  <label for="targetLang">Bahasa Tujuan (Sesudah)</label>
-  <select id="targetLang">
-    <option value="id" selected>Indonesian (Indonesia)</option>
-    <option value="en">English (Inggris)</option>
-    <option value="ja">Japanese (Jepang)</option>
-    <option value="zh">Chinese (Mandarin)</option>
-    <option value="ko">Korean (Korea)</option>
-    <option value="es">Spanish (Spanyol)</option>
-    <option value="fr">French (Prancis)</option>
-    <option value="de">German (Jerman)</option>
-    <option value="ar">Arabic (Arab)</option>
+  <label>Bahasa Tujuan</label>
+  <select id="tgtLang">
+    <option value="id" selected>Indonesian</option>
+    <option value="en">English</option>
+    <option value="ja">Japanese</option>
+    <option value="zh-CN">Chinese</option>
+    <option value="ko">Korean</option>
   </select>
 
-  <label>Posisi Hasil Terjemahan</label>
-  <div class="radio-group">
-    <label class="radio-item"><input type="radio" name="position" value="right" checked> Di Samping (Kolom Sebelah)</label>
-    <label class="radio-item"><input type="radio" name="position" value="below"> Di Bawah (Baris Sebelah)</label>
-    <label class="radio-item"><input type="radio" name="position" value="replace"> Timpa Sel Asli (Overwrite)</label>
+  <label>Posisi Hasil</label>
+  <div class="box">
+    <label class="radio-item"><input type="radio" name="pos" value="right" checked> Di Samping (Kolom Sebelah)</label>
+    <label class="radio-item"><input type="radio" name="pos" value="below"> Di Bawah (Baris Sebelah)</label>
+    <label class="radio-item"><input type="radio" name="pos" value="replace"> Timpa Sel Asli</label>
   </div>
 
-  <button id="btnTranslate" class="btn" onclick="handleTranslate()">Terjemahkan Sel Terpilih</button>
+  <button id="btnTrans" class="btn" onclick="startTranslate()">Terjemahkan Sel Terpilih</button>
 
   <div id="status" class="status"></div>
 
   <script>
     Office.onReady(function (info) {
       if (info.host === Office.HostType.Excel) {
-        showStatus("Add-in siap digunakan.", "info");
+        showStatus("Ready.", "info");
       }
     });
 
-    function handleTranslate() {
-      var btn = document.getElementById("btnTranslate");
-      var srcLang = document.getElementById("sourceLang").value;
-      var tgtLang = document.getElementById("targetLang").value;
-      var radios = document.getElementsByName("position");
-      var position = "right";
+    function startTranslate() {
+      var btn = document.getElementById("btnTrans");
+      var src = document.getElementById("srcLang").value;
+      var tgt = document.getElementById("tgtLang").value;
+      var radios = document.getElementsByName("pos");
+      var pos = "right";
 
       for (var i = 0; i < radios.length; i++) {
-        if (radios[i].checked) { position = radios[i].value; break; }
+        if (radios[i].checked) { pos = radios[i].value; break; }
       }
 
       btn.disabled = true;
-      btn.innerText = "Memproses Terjemahan...";
-      showStatus("Membaca sel terpilih...", "info");
+      btn.innerHTML = "Memproses...";
+      showStatus("Membaca sel Excel...", "info");
 
-      Excel.run(function (context) {
-        var range = context.workbook.getSelectedRange();
+      Excel.run(function (ctx) {
+        var range = ctx.workbook.getSelectedRange();
         range.load(["values", "rowCount", "columnCount"]);
 
-        return context.sync().then(function () {
-          var values = range.values;
-          var rowCount = values.length;
-          var colCount = values[0].length;
-          var totalCells = rowCount * colCount;
+        return ctx.sync().then(function () {
+          var vals = range.values;
+          var rCount = vals.length;
+          var cCount = vals[0].length;
+          var total = rCount * cCount;
+          var translated = [];
+          var pending = 0;
 
-          var translatedMatrix = [];
-          var pendingCount = 0;
-          var hasText = false;
-
-          // Inisialisasi matriks hasil
-          for (var r = 0; r < rowCount; r++) {
-            var rowArray = [];
-            for (var c = 0; c < colCount; c++) {
-              rowArray.push("");
-            }
-            translatedMatrix.push(rowArray);
+          for (var r = 0; r < rCount; r++) {
+            var row = [];
+            for (var c = 0; c < cCount; c++) row.push("");
+            translated.push(row);
           }
 
-          // Hitung sel yang berisi teks
-          for (var r = 0; r < rowCount; r++) {
-            for (var c = 0; c < colCount; c++) {
-              var str = values[r][c] ? values[r][c].toString().replace(/^\s+|\s+$/g, '') : "";
-              if (str !== "") {
-                hasText = true;
-                pendingCount++;
-              }
+          for (var r = 0; r < rCount; r++) {
+            for (var c = 0; c < cCount; c++) {
+              var txt = vals[r][c] ? String(vals[r][c]).replace(/^\s+|\s+$/g, '') : "";
+              if (txt !== "") pending++;
             }
           }
 
-          if (!hasText) {
-            showStatus("Tidak ada teks pada sel yang Anda pilih!", "warning");
+          if (pending === 0) {
+            showStatus("Pilih sel yang berisi teks!", "error");
             btn.disabled = false;
-            btn.innerText = "Terjemahkan Sel Terpilih";
+            btn.innerHTML = "Terjemahkan Sel Terpilih";
             return;
           }
 
-          showStatus("Menerjemahkan " + pendingCount + " sel...", "info");
+          showStatus("Menerjemahkan " + pending + " sel...", "info");
 
-          // Eksekusi terjemahan paralel per sel
-          for (var r = 0; r < rowCount; r++) {
-            for (var c = 0; c < colCount; c++) {
-              var text = values[r][c] ? values[r][c].toString().replace(/^\s+|\s+$/g, '') : "";
+          for (var r = 0; r < rCount; r++) {
+            for (var c = 0; c < cCount; c++) {
+              var text = vals[r][c] ? String(vals[r][c]).replace(/^\s+|\s+$/g, '') : "";
               if (text !== "") {
-                (function(row, col, txt) {
-                  jsonpTranslate(txt, srcLang, tgtLang, function(res) {
-                    translatedMatrix[row][col] = res;
-                    pendingCount--;
+                (function (row, col, str) {
+                  googleTranslate(str, src, tgt, function (res) {
+                    translated[row][col] = res;
+                    pending--;
 
-                    if (pendingCount <= 0) {
-                      // Semua sel selesai diproses, tulis hasil ke Excel
+                    if (pending <= 0) {
                       var targetRange;
-                      if (position === "replace") targetRange = range;
-                      else if (position === "right") targetRange = range.getOffsetRange(0, colCount);
-                      else if (position === "below") targetRange = range.getOffsetRange(rowCount, 0);
+                      if (pos === "replace") targetRange = range;
+                      else if (pos === "right") targetRange = range.getOffsetRange(0, cCount);
+                      else if (pos === "below") targetRange = range.getOffsetRange(rCount, 0);
 
-                      targetRange.values = translatedMatrix;
-                      context.sync().then(function() {
-                        showStatus("Selesai menerjemahkan " + totalCells + " sel!", "success");
+                      targetRange.values = translated;
+                      ctx.sync().then(function () {
+                        showStatus("Selesai menerjemahkan " + total + " sel!", "success");
                         btn.disabled = false;
-                        btn.innerText = "Terjemahkan Sel Terpilih";
-                      }).catch(function(err) {
-                        showStatus("Gagal menulis ke sel: " + (err.message || err), "error");
-                        btn.disabled = false;
-                        btn.innerText = "Terjemahkan Sel Terpilih";
+                        btn.innerHTML = "Terjemahkan Sel Terpilih";
                       });
                     }
                   });
@@ -169,53 +143,61 @@
             }
           }
         });
-      }).catch(function (error) {
-        showStatus("Gagal membaca sel: " + (error.message || error), "error");
+      }).catch(function (err) {
+        showStatus("Gagal: " + err.message, "error");
         btn.disabled = false;
-        btn.innerText = "Terjemahkan Sel Terpilih";
+        btn.innerHTML = "Terjemahkan Sel Terpilih";
       });
     }
 
-    // Engine JSONP untuk IE11 / Excel 2016
-    function jsonpTranslate(text, from, to, callback) {
-      var src = (from === "auto") ? "" : from;
-      var pair = (src || "autodetect") + "|" + to;
-      var cbName = "cb_" + Math.floor(Math.random() * 10000000);
-
-      var isResponded = false;
+    // Engine Google Translate GTX (JSONP)
+    function googleTranslate(text, sl, tl, cb) {
+      var cbName = "cb_" + Math.floor(Math.random() * 1000000);
+      var done = false;
 
       window[cbName] = function (data) {
-        if (isResponded) return;
-        isResponded = true;
-
-        delete window[cbName];
-        var script = document.getElementById(cbName);
-        if (script && script.parentNode) script.parentNode.removeChild(script);
-
-        if (data && data.responseData && data.responseData.translatedText) {
-          callback(data.responseData.translatedText);
+        if (done) return;
+        done = true;
+        clean();
+        if (data && data[0]) {
+          var out = "";
+          for (var i = 0; i < data[0].length; i++) {
+            if (data[0][i][0]) out += data[0][i][0];
+          }
+          cb(out);
         } else {
-          callback("[Gagal]");
+          cb("[Gagal]");
         }
       };
 
-      var url = "https://api.mymemory.translated.net/get?q=" + encodeURIComponent(text) + "&langpair=" + encodeURIComponent(pair) + "&callback=" + cbName;
-      var scriptElem = document.createElement("script");
-      scriptElem.id = cbName;
-      scriptElem.src = url;
+      function clean() {
+        delete window[cbName];
+        var s = document.getElementById(cbName);
+        if (s && s.parentNode) s.parentNode.removeChild(s);
+      }
 
-      // Handling timeout jika koneksi internet lambat
-      setTimeout(function() {
-        if (!isResponded) {
-          isResponded = true;
-          delete window[cbName];
-          if (scriptElem && scriptElem.parentNode) scriptElem.parentNode.removeChild(scriptElem);
-          callback("[Timeout]");
+      var url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" + sl + "&tl=" + tl + "&dt=t&q=" + encodeURIComponent(text) + "&callback=" + cbName;
+      var script = document.createElement("script");
+      script.id = cbName;
+      script.src = url;
+
+      setTimeout(function () {
+        if (!done) {
+          done = true;
+          clean();
+          cb("[Timeout]");
         }
-      }, 8000);
+      }, 6000);
 
-      document.body.appendChild(scriptElem);
+      document.body.appendChild(script);
     }
 
     function showStatus(msg, type) {
-      var el = document.getElementById("status
+      var el = document.getElementById("status");
+      el.style.display = "block";
+      el.className = "status status-" + type;
+      el.innerText = msg;
+    }
+  </script>
+</body>
+</html>
