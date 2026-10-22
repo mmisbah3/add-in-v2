@@ -4,7 +4,7 @@ Office.onReady(function (info) {
   }
 });
 
-// Helper HTTP Request menggunakan XMLHttpRequest murni (Universal)
+// Helper HTTP Request menggunakan XMLHttpRequest murni (Kompatibel IE11 / Excel 2016)
 function fetchTranslation(text, callback) {
   var url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=id&tl=en&dt=t&q=" + encodeURIComponent(text);
   var xhr = new XMLHttpRequest();
@@ -57,18 +57,13 @@ function handleTranslate() {
   }
 
   Excel.run(function (context) {
-    var sheet = context.workbook.worksheets.getActiveWorksheet();
     var selectedRange = context.workbook.getSelectedRange();
-    var shapes = sheet.shapes;
-
     selectedRange.load(["values", "rowCount", "columnCount"]);
-    shapes.load("items");
 
     return context.sync().then(function () {
       var originalValues = selectedRange.values;
       var updatedValues = JSON.parse(JSON.stringify(originalValues));
       var cellsToUpdate = [];
-      var totalProcessed = 0;
 
       // 1. Kumpulkan semua sel yang berisi teks
       for (var r = 0; r < selectedRange.rowCount; r++) {
@@ -76,7 +71,6 @@ function handleTranslate() {
           var cellVal = originalValues[r][c];
           if (cellVal !== null && cellVal !== undefined && cleanTrim(cellVal) !== "") {
             cellsToUpdate.push({
-              type: "cell",
               row: r,
               col: c,
               text: cleanTrim(cellVal)
@@ -85,78 +79,46 @@ function handleTranslate() {
         }
       }
 
-      // 2. Kumpulkan Shape yang memiliki teks
-      for (var s = 0; s < shapes.items.length; s++) {
-        var shp = shapes.items[s];
-        if (shp.textFrame) {
-          shp.textFrame.load(["hasText", "textRange"]);
-        }
+      // Cek apakah ada sel yang diproses
+      if (cellsToUpdate.length === 0) {
+        statusDiv.className = "error";
+        statusDiv.innerText = "Pilih sel yang berisi teks terlebih dahulu!";
+        return;
       }
 
-      return context.sync().then(function () {
-        var shapeItems = [];
-        for (var k = 0; k < shapes.items.length; k++) {
-          var itemShape = shapes.items[k];
-          if (itemShape.textFrame && itemShape.textFrame.hasText) {
-            var rawText = itemShape.textFrame.textRange.text;
-            if (rawText && cleanTrim(rawText) !== "") {
-              shapeItems.push({
-                type: "shape",
-                shapeObj: itemShape,
-                text: cleanTrim(rawText)
-              });
-            }
-          }
-        }
+      var totalProcessed = 0;
 
-        var allItems = cellsToUpdate.concat(shapeItems);
-
-        if (allItems.length === 0) {
-          statusDiv.className = "error";
-          statusDiv.innerText = "Pilih sel atau shape yang berisi teks!";
-          return;
-        }
-
-        // 3. Proses terjemahan item satu per satu
-        function processNext(index) {
-          if (index >= allItems.length) {
-            // Tulis kembali hasil ke Range Sel
-            selectedRange.values = updatedValues;
-            if (position === "newline") {
-              selectedRange.format.wrapText = true;
-            }
-
-            return context.sync().then(function () {
-              statusDiv.className = "success";
-              statusDiv.innerText = "✓ Berhasil memperbarui " + totalProcessed + " elemen!";
-            });
+      // 2. Proses terjemahan sel satu per satu secara berurutan
+      function processNextCell(index) {
+        if (index >= cellsToUpdate.length) {
+          // Setelah semua sel selesai diterjemahkan, tulis kembali ke Excel
+          selectedRange.values = updatedValues;
+          if (position === "newline") {
+            selectedRange.format.wrapText = true;
           }
 
-          var current = allItems[index];
-          fetchTranslation(current.text, function (err, translated) {
-            if (!err && translated) {
-              var cleanTrans = cleanTrim(translated);
-              var result = "";
-
-              if (position === "newline") {
-                result = current.text + "\n" + cleanTrans;
-              } else {
-                result = current.text + " " + cleanTrans;
-              }
-
-              if (current.type === "cell") {
-                updatedValues[current.row][current.col] = result;
-              } else if (current.type === "shape") {
-                current.shapeObj.textFrame.textRange.text = result;
-              }
-              totalProcessed++;
-            }
-            processNext(index + 1);
+          return context.sync().then(function () {
+            statusDiv.className = "success";
+            statusDiv.innerText = "✓ Berhasil memperbarui " + totalProcessed + " sel!";
           });
         }
 
-        processNext(0);
-      });
+        var item = cellsToUpdate[index];
+        fetchTranslation(item.text, function (err, translated) {
+          if (!err && translated) {
+            var cleanTrans = cleanTrim(translated);
+            if (position === "newline") {
+              updatedValues[item.row][item.col] = item.text + "\n" + cleanTrans;
+            } else {
+              updatedValues[item.row][item.col] = item.text + " " + cleanTrans;
+            }
+            totalProcessed++;
+          }
+          processNextCell(index + 1);
+        });
+      }
+
+      processNextCell(0);
     });
   }).catch(function (error) {
     console.log(error);
